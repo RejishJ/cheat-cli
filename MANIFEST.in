@@ -1,0 +1,1 @@
+recursive-include cheat_cli/data *.csv

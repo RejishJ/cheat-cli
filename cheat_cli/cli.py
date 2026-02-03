@@ -7,6 +7,9 @@ from importlib.resources import files
 
 # ---------- Helpers ----------
 
+def get_csv_path():
+    return files("cheat_cli").joinpath("data/commands.csv")
+
 def csv_path():
     return files("cheat_cli").joinpath("data/commands.csv")
 
