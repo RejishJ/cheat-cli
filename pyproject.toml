@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "cheat-cli"
+version = "0.1.0"
+description = "A terminal-first personal cheat sheet for Linux developers"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Rejish"}]
+dependencies = ["pandas", "tabulate"]
+requires-python = ">=3.8"
+
+[project.scripts]
+cheat = "cheat_cli.cli:main"
