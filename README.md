@@ -19,6 +19,19 @@ Built with Python, designed for daily use by developers who live in the terminal
 
 ---
 
+## 🔄 Syncing Across Machines
+
+Your personal cheat data is stored locally at:
+
+~/.local/share/cheat-cli/commands.csv
+
+To use the same cheats on multiple machines, you can:
+- Keep this file in a private Git repository
+- Or place it inside a cloud-synced folder (Dropbox, Syncthing, etc.)
+
+This keeps your data private and under your control.
+
+
 ## 📦 Installation
 
 Install from PyPI:
