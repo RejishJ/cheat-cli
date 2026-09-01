@@ -32,7 +32,7 @@ To use the same cheats on multiple machines, you can:
 This keeps your data private and under your control.
 
 
-## 📦 Installation
+## Installation
 
 Install from PyPI:
 
