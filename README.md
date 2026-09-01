@@ -9,17 +9,17 @@ Built with Python, designed for daily use by developers who live in the terminal
 
 ## Features
 
-- 🔍 **Instant search** across tools, commands, descriptions, and tags
-- ➕ **Interactive add mode** (`cheat add`)
-- 🗑️ **Safe delete** with confirmation (`cheat delete`)
-- 📦 **User-writable data** stored outside `site-packages`
-- 📊 **Clean terminal tables** with readable formatting
-- 🚀 **Globally available CLI** after install
-- 🐧 Linux-first, terminal-native workflow
+- **Instant search** across tools, commands, descriptions, and tags
+- **Interactive add mode** (`cheat add`)
+- **Safe delete** with confirmation (`cheat delete`)
+- **User-writable data** stored outside `site-packages`
+- **Clean terminal tables** with readable formatting
+- **Globally available CLI** after install
+- Linux-first, terminal-native workflow
 
 ---
 
-## 🔄 Syncing Across Machines
+## Syncing Across Machines
 
 Your personal cheat data is stored locally at:
 
