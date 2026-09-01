@@ -7,7 +7,7 @@ Built with Python, designed for daily use by developers who live in the terminal
 
 ---
 
-## ✨ Features
+##Features
 
 - 🔍 **Instant search** across tools, commands, descriptions, and tags
 - ➕ **Interactive add mode** (`cheat add`)
