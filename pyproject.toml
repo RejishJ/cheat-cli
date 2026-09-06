@@ -8,23 +8,10 @@ name = "cheat-cli"
 version = "0.1.3"
 description = "A terminal-first personal cheat sheet for Linux developers"
 readme = "README.md"
-license = {text = "Proprietary"}
-authors = [{name = "Rejish J"}]
+license = {text = "MIT"}
+authors = [{name = "Rejish"}]
 dependencies = ["pandas", "tabulate"]
 requires-python = ">=3.8"
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Environment :: Console",
-    "Intended Audience :: Developers",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Utilities",
-]
 
 [project.scripts]
 cheat = "cheat_cli.cli:main"
