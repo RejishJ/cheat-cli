@@ -42,6 +42,15 @@ def data_dir() -> Path:
     return Path.home() / ".local" / "share" / "cheat-cli"
 
 
+def legacy_data_dir() -> Path:
+    """Return the pre-0.2 data directory (used on all platforms).
+
+    This is ~/.local/share/cheat-cli/ regardless of platform.
+    Used only for migrating data from v0.1.x installations.
+    """
+    return Path.home() / ".local" / "share" / "cheat-cli"
+
+
 def user_csv_path() -> Path:
     """Return the full path to the user's commands.csv file."""
     return data_dir() / "commands.csv"

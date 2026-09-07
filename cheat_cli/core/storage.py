@@ -9,18 +9,35 @@ import tempfile
 from pathlib import Path
 
 from .models import CSV_FIELDS, Entry
-from .paths import packaged_csv_path, user_csv_path
+from .paths import legacy_data_dir, packaged_csv_path, user_csv_path
 
 
 def ensure_user_csv() -> Path:
-    """Ensure the user's CSV file exists, copying from package seed if needed.
+    """Ensure the user's CSV file exists, migrating or seeding as needed.
 
-    Returns the path to the user's CSV file.
+    Handles three cases:
+      A) New path already exists → use it (no overwrite).
+      B) New path missing, legacy path exists → copy legacy data to new location.
+      C) Neither exists → initialize from bundled seed CSV.
+
+    Returns:
+        Path to the user's CSV file.
     """
     path = user_csv_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    if not path.exists():
-        shutil.copy(str(packaged_csv_path()), str(path))
+
+    # Case A: new path already exists
+    if path.exists():
+        return path
+
+    # Case B: legacy path exists → migrate (copy, don't delete original)
+    legacy_csv = legacy_data_dir() / "commands.csv"
+    if legacy_csv.exists():
+        shutil.copy2(str(legacy_csv), str(path))
+        return path
+
+    # Case C: neither exists → seed from package
+    shutil.copy(str(packaged_csv_path()), str(path))
     return path
 
 

@@ -15,10 +15,21 @@ class Entry:
     description: str
     tags: str
 
+    def __post_init__(self) -> None:
+        if not self.tool or not self.tool.strip():
+            raise ValueError("tool must not be empty")
+        if not self.command or not self.command.strip():
+            raise ValueError("command must not be empty")
+
     def to_dict(self) -> dict[str, str]:
         return asdict(self)
 
     def matches(self, query: str) -> bool:
-        """Case-insensitive search across all fields."""
+        """Case-insensitive partial match across all fields."""
         q = query.lower()
-        return any(q in getattr(self, field).lower() for field in CSV_FIELDS)
+        return (
+            q in self.tool.lower()
+            or q in self.command.lower()
+            or q in self.description.lower()
+            or q in self.tags.lower()
+        )
