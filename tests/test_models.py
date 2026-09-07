@@ -1,5 +1,7 @@
 """Tests for cheat_cli.core.models."""
 
+import pytest
+
 from cheat_cli.core.models import CSV_FIELDS, Entry
 
 
@@ -10,6 +12,27 @@ class TestEntry:
         assert e.command == "git status"
         assert e.description == "Show status"
         assert e.tags == "repo"
+
+    def test_rejects_empty_tool(self):
+        with pytest.raises(ValueError, match="tool must not be empty"):
+            Entry(tool="", command="git status", description="Show status", tags="repo")
+
+    def test_rejects_whitespace_tool(self):
+        with pytest.raises(ValueError, match="tool must not be empty"):
+            Entry(tool="   ", command="git status", description="Show status", tags="repo")
+
+    def test_rejects_empty_command(self):
+        with pytest.raises(ValueError, match="command must not be empty"):
+            Entry(tool="git", command="", description="Show status", tags="repo")
+
+    def test_rejects_whitespace_command(self):
+        with pytest.raises(ValueError, match="command must not be empty"):
+            Entry(tool="git", command="   ", description="Show status", tags="repo")
+
+    def test_allows_empty_description_and_tags(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.description == ""
+        assert e.tags == ""
 
     def test_to_dict(self):
         e = Entry(tool="git", command="git status", description="Show status", tags="repo")

@@ -10,12 +10,7 @@ import argparse
 import sys
 
 from . import __version__
-from .core.search import search_entries
-from .core.storage import (
-    add_entry,
-    delete_entries,
-    load_entries,
-)
+from .cheat_service import CheatService
 from .ui.table import print_entries
 from .ui.terminal import blue, green, red
 
@@ -101,24 +96,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cmd_ls(args: argparse.Namespace) -> int:
+def cmd_ls(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat ls' and 'cheat ls <query>'."""
-    entries = load_entries()
+    entries = service.list_entries()
     if args.query:
-        entries = search_entries(entries, args.query)
+        entries = service.search(entries, args.query)
     print_entries(entries)
     return 0
 
 
-def cmd_search(args: argparse.Namespace) -> int:
+def cmd_search(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat search <query>'."""
-    entries = load_entries()
-    results = search_entries(entries, args.query)
+    entries = service.list_entries()
+    results = service.search(entries, args.query)
     print_entries(results)
     return 0
 
 
-def cmd_add(args: argparse.Namespace) -> int:
+def cmd_add(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat add'."""
     print(blue("Interactive add mode"))
     tool = input("Tool: ").strip()
@@ -131,7 +126,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        add_entry(tool, command, description, tags)
+        service.add_entry(tool, command, description, tags)
         print(green("Command added."))
         return 0
     except ValueError as e:
@@ -139,10 +134,10 @@ def cmd_add(args: argparse.Namespace) -> int:
         return 1
 
 
-def cmd_rm(args: argparse.Namespace) -> int:
+def cmd_rm(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat rm <query>'."""
-    entries = load_entries()
-    matches = [e for e in entries if args.query.lower() in e.command.lower()]
+    entries = service.list_entries()
+    matches = service.search(entries, args.query)
 
     if not matches:
         print(red("No match found."))
@@ -154,25 +149,25 @@ def cmd_rm(args: argparse.Namespace) -> int:
         print("Cancelled.")
         return 0
 
-    deleted = delete_entries(args.query)
-    print(green(f"Deleted {len(deleted)} {'entry' if len(deleted) == 1 else 'entries'}."))
+    deleted = service.delete_entries_by_values(matches)
+    print(green(f"Deleted {deleted} {'entry' if deleted == 1 else 'entries'}."))
     return 0
 
 
-def cmd_all(args: argparse.Namespace) -> int:
+def cmd_all(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat all' (compatibility alias for 'cheat ls')."""
     print(red("'cheat all' is deprecated. Use 'cheat ls' instead."), file=sys.stderr)
-    return cmd_ls(args)
+    return cmd_ls(args, service)
 
 
-def cmd_delete(args: argparse.Namespace) -> int:
+def cmd_delete(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat delete' (compatibility alias for 'cheat rm')."""
     print(red("'cheat delete' is deprecated. Use 'cheat rm' instead."), file=sys.stderr)
     if not args.query:
         print(red("Error: missing required argument 'query'."), file=sys.stderr)
         print("Usage: cheat rm <query>", file=sys.stderr)
         return 1
-    return cmd_rm(args)
+    return cmd_rm(args, service)
 
 
 COMMAND_MAP = {
@@ -207,7 +202,8 @@ def main(argv: list[str] | None = None) -> int:
         print("Run 'cheat --help' for available commands.", file=sys.stderr)
         return 1
 
-    return handler(args)
+    service = CheatService()
+    return handler(args, service)
 
 
 if __name__ == "__main__":

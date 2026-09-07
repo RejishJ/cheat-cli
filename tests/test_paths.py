@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-from cheat_cli.core.paths import data_dir, is_wsl, user_csv_path
+from cheat_cli.core.paths import data_dir, is_wsl, legacy_data_dir, user_csv_path
 
 
 class TestDataDir:
@@ -72,3 +72,9 @@ class TestIsWsl:
             mock_sys.platform = "linux"
             with patch.dict(os.environ, {"WSL_DISTRO_NAME": "Ubuntu"}, clear=False):
                 assert is_wsl() is True
+
+
+class TestLegacyDataDir:
+    def test_returns_home_local_share(self):
+        result = legacy_data_dir()
+        assert result == Path.home() / ".local" / "share" / "cheat-cli"

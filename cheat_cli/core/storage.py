@@ -147,6 +147,67 @@ def add_entry(
     return entry
 
 
+def delete_entry(
+    entry: Entry,
+    csv_path: Path | None = None,
+) -> bool:
+    """Delete a single entry by value equality.
+
+    Matches by comparing all four fields (tool, command, description, tags).
+    Removes the first matching entry found.
+
+    Args:
+        entry: The entry to delete (matched by value, not identity).
+        csv_path: Path to CSV file. If None, uses the user's default path.
+
+    Returns:
+        True if the entry was found and deleted, False otherwise.
+    """
+    entries = load_entries(csv_path)
+    for i, existing in enumerate(entries):
+        if (
+            existing.tool == entry.tool
+            and existing.command == entry.command
+            and existing.description == entry.description
+            and existing.tags == entry.tags
+        ):
+            entries.pop(i)
+            save_entries(entries, csv_path)
+            return True
+    return False
+
+
+def delete_entries_by_values(
+    targets: list[Entry],
+    csv_path: Path | None = None,
+) -> int:
+    """Delete specific entries by value equality.
+
+    Each target is matched by comparing all four fields (tool, command,
+    description, tags). Removes the first matching entry found for each target.
+
+    Args:
+        targets: List of entries to delete (matched by value, not identity).
+        csv_path: Path to CSV file. If None, uses the user's default path.
+
+    Returns:
+        Number of entries deleted.
+    """
+    if not targets:
+        return 0
+
+    entries = load_entries(csv_path)
+    target_set = {(t.tool, t.command, t.description, t.tags) for t in targets}
+    remaining = [
+        e for e in entries
+        if (e.tool, e.command, e.description, e.tags) not in target_set
+    ]
+    deleted_count = len(entries) - len(remaining)
+    if deleted_count > 0:
+        save_entries(remaining, csv_path)
+    return deleted_count
+
+
 def delete_entries(
     query: str,
     csv_path: Path | None = None,

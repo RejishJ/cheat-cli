@@ -1,5 +1,8 @@
 """Tests for cheat_cli.cli — the main CLI dispatcher."""
 
+import subprocess
+import sys
+
 import pytest
 
 from cheat_cli.cli import build_parser, main
@@ -73,6 +76,12 @@ class TestBuildParser:
         assert args.query == "git"
 
 
+def _make_service(sample_csv):
+    """Create a CheatService backed by a test CSV file."""
+    from cheat_cli.cheat_service import CheatService
+    return CheatService(csv_path=sample_csv)
+
+
 class TestMain:
     def test_no_args_prints_help(self, capsys):
         exit_code = main([])
@@ -88,28 +97,29 @@ class TestMain:
         assert "invalid choice" in captured.err.lower() or "unknown" in captured.err.lower()
 
     def test_ls_empty_storage(self, empty_csv, monkeypatch, capsys):
-        monkeypatch.setattr("cheat_cli.cli.load_entries", list)
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(empty_csv),
+        )
         exit_code = main(["ls"])
         assert exit_code == 0
         captured = capsys.readouterr()
         assert "No results found" in captured.out
 
     def test_ls_with_data(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.storage import load_entries
-        monkeypatch.setattr("cheat_cli.cli.load_entries", lambda: load_entries(sample_csv))
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
         exit_code = main(["ls"])
         assert exit_code == 0
         captured = capsys.readouterr()
         assert "git" in captured.out
 
     def test_ls_with_query(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.search import search_entries
-        from cheat_cli.core.storage import load_entries
-
-        entries = load_entries(sample_csv)
         monkeypatch.setattr(
-            "cheat_cli.cli.load_entries",
-            lambda: search_entries(entries, "docker"),
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
         )
         exit_code = main(["ls", "docker"])
         assert exit_code == 0
@@ -118,13 +128,9 @@ class TestMain:
         assert "git" not in captured.out
 
     def test_search_same_as_ls_query(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.search import search_entries
-        from cheat_cli.core.storage import load_entries
-
-        entries = load_entries(sample_csv)
         monkeypatch.setattr(
-            "cheat_cli.cli.load_entries",
-            lambda: search_entries(entries, "git"),
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
         )
         exit_code = main(["search", "git"])
         assert exit_code == 0
@@ -132,16 +138,20 @@ class TestMain:
         assert "git" in captured.out
 
     def test_rm_no_match(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.storage import load_entries
-        monkeypatch.setattr("cheat_cli.cli.load_entries", lambda: load_entries(sample_csv))
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
         exit_code = main(["rm", "nonexistent"])
         assert exit_code == 1
         captured = capsys.readouterr()
         assert "No match found" in captured.out
 
     def test_rm_cancelled(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.storage import load_entries
-        monkeypatch.setattr("cheat_cli.cli.load_entries", lambda: load_entries(sample_csv))
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
         monkeypatch.setattr("builtins.input", lambda _: "no")
         exit_code = main(["rm", "docker"])
         assert exit_code == 0
@@ -149,16 +159,20 @@ class TestMain:
         assert "Cancelled" in captured.out
 
     def test_all_deprecated(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.storage import load_entries
-        monkeypatch.setattr("cheat_cli.cli.load_entries", lambda: load_entries(sample_csv))
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
         exit_code = main(["all"])
         assert exit_code == 0
         captured = capsys.readouterr()
         assert "deprecated" in captured.err.lower()
 
     def test_delete_deprecated(self, sample_csv, monkeypatch, capsys):
-        from cheat_cli.core.storage import load_entries
-        monkeypatch.setattr("cheat_cli.cli.load_entries", lambda: load_entries(sample_csv))
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
         monkeypatch.setattr("builtins.input", lambda _: "no")
         exit_code = main(["delete", "docker"])
         assert exit_code == 0
@@ -170,3 +184,38 @@ class TestMain:
         assert exit_code == 1
         captured = capsys.readouterr()
         assert "missing required argument" in captured.err.lower()
+
+    def test_rm_successful_deletion(self, sample_csv, monkeypatch, capsys):
+        monkeypatch.setattr(
+            "cheat_cli.cli.CheatService",
+            lambda: _make_service(sample_csv),
+        )
+        monkeypatch.setattr("builtins.input", lambda _: "yes")
+        exit_code = main(["rm", "docker ps"])
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert "Deleted" in captured.out
+
+
+class TestEntryPoint:
+    def test_module_help(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "cheat_cli", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert "cheat" in result.stdout.lower()
+
+    def test_module_version(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "cheat_cli", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert "cheat-cli" in result.stdout
