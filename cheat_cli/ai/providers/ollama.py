@@ -37,6 +37,10 @@ class OllamaProvider:
     def requires_api_key(self) -> bool:
         return False
 
+    @property
+    def is_local(self) -> bool:
+        return True
+
     def suggest_commands(
         self,
         request: str,

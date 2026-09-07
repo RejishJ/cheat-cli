@@ -37,11 +37,24 @@ class OpenAICompatibleProvider:
     def requires_api_key(self) -> bool:
         return True
 
+    @property
+    def is_local(self) -> bool:
+        return False
+
     def suggest_commands(
         self,
         request: str,
         context: AIContext | None = None,
     ) -> list[AICommandSuggestion]:
+        from ...config import is_offline
+
+        if is_offline():
+            raise ProviderConfigError(
+                "Offline mode is active.\n"
+                "The openai-compatible provider requires network access.\n"
+                "Use --no-offline or configure a local provider (ollama)."
+            )
+
         if not self._api_key:
             raise ProviderConfigError(
                 "API key is required for OpenAI-compatible provider.\n"

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .models import AICommandSuggestion, AIContext
-from .provider import AIProvider
+from .provider import AIProvider, ProviderConfigError
 from .registry import get_provider
 
 
@@ -36,9 +36,20 @@ class AIService:
 
         Raises:
             ProviderError: If the request fails.
+            ProviderConfigError: If offline mode prevents the request.
         """
+        from ..config import is_offline
+
         if not request or not request.strip():
             raise ValueError("Request must not be empty")
+
+        # Check offline mode before attempting any provider call
+        if is_offline() and not self.provider.is_local:
+            raise ProviderConfigError(
+                f"Offline mode is active.\n"
+                f"The '{self.provider.name}' provider requires network access.\n"
+                f"Use a local provider (ollama) or disable offline mode."
+            )
 
         effective_context = context or AIContext.detect()
         return self.provider.suggest_commands(request.strip(), effective_context)

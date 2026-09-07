@@ -37,6 +37,11 @@ class AIProvider(Protocol):
         """Return True if this provider requires an API key."""
         ...
 
+    @property
+    def is_local(self) -> bool:
+        """Return True if this provider is local (no external network)."""
+        ...
+
     def suggest_commands(
         self,
         request: str,
