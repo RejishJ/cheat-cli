@@ -37,39 +37,39 @@ class TestListEntries:
 class TestSearch:
     def test_search_filters_by_tool(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "git")
+        results = service.search_filtered(entries, "git")
         assert len(results) == 2
         assert all(e.tool == "git" for e in results)
 
     def test_search_filters_by_command(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "docker ps")
+        results = service.search_filtered(entries, "docker ps")
         assert len(results) == 1
         assert results[0].command == "docker ps"
 
     def test_search_filters_by_description(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "containers")
+        results = service.search_filtered(entries, "containers")
         assert len(results) == 1
 
     def test_search_filters_by_tags(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "repo")
+        results = service.search_filtered(entries, "repo")
         assert len(results) == 1
 
     def test_search_case_insensitive(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "DOCKER")
+        results = service.search_filtered(entries, "DOCKER")
         assert len(results) == 1
 
     def test_search_no_match(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "kubectl")
+        results = service.search_filtered(entries, "kubectl")
         assert results == []
 
     def test_search_empty_query_returns_all(self, service: CheatService):
         entries = service.list_entries()
-        results = service.search(entries, "")
+        results = service.search_filtered(entries, "")
         assert len(results) == 3
 
 
@@ -157,7 +157,7 @@ class TestSearchAll:
 class TestDeleteEntriesByValues:
     def test_delete_matched_entries(self, service: CheatService):
         entries = service.list_entries()
-        matches = service.search(entries, "git")
+        matches = service.search_filtered(entries, "git")
         assert len(matches) == 2
 
         deleted = service.delete_entries_by_values(matches)
@@ -170,7 +170,7 @@ class TestDeleteEntriesByValues:
     def test_delete_by_tag_search(self, service: CheatService):
         """Regression: search by tag, delete those exact entries."""
         entries = service.list_entries()
-        matches = service.search(entries, "repo")
+        matches = service.search_filtered(entries, "repo")
         assert len(matches) == 1
         assert matches[0].command == "git status"
 

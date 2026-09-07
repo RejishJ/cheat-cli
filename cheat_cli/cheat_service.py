@@ -26,8 +26,8 @@ class CheatService:
         """Load all entries from storage."""
         return load_entries(self._csv_path)
 
-    def search(self, entries: list[Entry], query: str) -> list[Entry]:
-        """Filter entries by query across all fields."""
+    def search_filtered(self, entries: list[Entry], query: str) -> list[Entry]:
+        """Filter a pre-loaded list of entries by query across all fields."""
         return search_entries(entries, query)
 
     def search_all(self, query: str) -> list[Entry]:

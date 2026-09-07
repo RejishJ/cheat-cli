@@ -12,12 +12,27 @@ import sys
 from . import __version__
 from .cheat_service import CheatService
 from .ui.table import print_entries
-from .ui.terminal import blue, green, red
+from .ui.terminal import blue, green, is_tty, red
 
 
 def _get_version() -> str:
     """Return the version string."""
     return f"cheat-cli {__version__}"
+
+
+def _try_launch_tui(service: CheatService, query: str = "") -> bool:
+    """Attempt to launch the TUI. Returns True if launched, False otherwise."""
+    if not is_tty():
+        return False
+    try:
+        import importlib.util
+        if importlib.util.find_spec("cheat_cli.ui.tui") is None:
+            return False
+    except (ImportError, ValueError):
+        return False
+    from .ui.tui.app import run_tui
+    run_tui(service, query)
+    return True
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,9 +113,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cmd_ls(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat ls' and 'cheat ls <query>'."""
+    query = args.query or ""
+    if _try_launch_tui(service, query):
+        return 0
+
     entries = service.list_entries()
-    if args.query:
-        entries = service.search(entries, args.query)
+    if query:
+        entries = service.search_filtered(entries, query)
     print_entries(entries)
     return 0
 
@@ -108,7 +127,7 @@ def cmd_ls(args: argparse.Namespace, service: CheatService) -> int:
 def cmd_search(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat search <query>'."""
     entries = service.list_entries()
-    results = service.search(entries, args.query)
+    results = service.search_filtered(entries, args.query)
     print_entries(results)
     return 0
 
@@ -137,7 +156,7 @@ def cmd_add(args: argparse.Namespace, service: CheatService) -> int:
 def cmd_rm(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat rm <query>'."""
     entries = service.list_entries()
-    matches = service.search(entries, args.query)
+    matches = service.search_filtered(entries, args.query)
 
     if not matches:
         print(red("No match found."))
@@ -193,6 +212,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command is None:
+        service = CheatService()
+        if _try_launch_tui(service):
+            return 0
         parser.print_help()
         return 0
 
