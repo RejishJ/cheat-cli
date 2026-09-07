@@ -1,2 +1,50 @@
 tool,command,description,tags
 git,git status,Show current git working tree status,repo state branch
+git,git log --oneline -10,Show last 10 commits in compact format,history log
+git,git diff,Show unstaged changes,diff changes
+git,git add -p,Interactively stage changes,h staging
+git,git commit -m "msg",Commit staged changes with message,commit
+git,git rebase -i,Interactive rebase to edit history,rebase history
+git,git stash,Stash uncommitted changes,stash save work
+git,git branch -a,List all branches including remote,branch list
+docker,docker ps,List running containers,containers list
+docker,docker compose up -d,Start services in detached mode,services start
+docker,docker compose logs -f,Follow service logs,logs debug
+docker,docker exec -it <container> bash,Open shell in running container,shell access
+docker,docker system prune -a,Remove unused containers and images,cleanup space
+python,python -m venv .venv,Create a virtual environment,venv setup
+python,pip install -r requirements.txt,Install dependencies from file,install deps
+python,python -m pytest,Run tests with pytest,testing
+python,python -m black .,Format code with black,formatting style
+python,python -m ruff check .,Lint code with ruff,linting style
+curl,curl -s -o /dev/null -w "%{http_code}" <url>,Get HTTP status code only,http status check
+curl,curl -X POST -H "Content-Type: application/json" -d '{}' <url>,Send JSON POST request,api post
+ssh,ssh -L 8080:localhost:80 <host>,Forward local port 8080 to remote host,tunnel port
+ssh,ssh -N -f -L 5432:localhost:5432 <host>,Background SSH tunnel for database,tunnel db
+find,find . -name "*.py" -type f,Find all Python files in directory,search files
+find,find . -mtime -7 -type f,Find files modified in last 7 days,search recent
+grep,grep -rn "pattern" .,Recursive search with line numbers,search text
+grep,grep -l "pattern" **/*.py,Find files containing pattern,search files
+xargs,find . -name "*.log" -delete,Delete all .log files, cleanup
+tar,tar -czf archive.tar.gz <dir>,Create compressed archive,archive compress
+tar,tar -xzf archive.tar.gz,Extract compressed archive,archive extract
+chmod,chmod +x script.sh,Make script executable,permissions
+chmod,chmod 700 ~/.ssh,Secure SSH directory,permissions security
+systemctl,systemctl status <service>,Check service status,service debug
+systemctl,systemctl restart <service>,Restart a service,service restart
+awk,awk '{print $1}' file,Print first column of file,text processing
+sed,sed -i 's/old/new/g' file,Replace text in file in-place,text replace
+jq,jq '.key' file.json,Extract key from JSON,json query
+jq,jq -c '.' file.json,Compact JSON output,json format
+git,git log --graph --oneline --all,Visual commit graph,history graph
+git,git clean -fd,Remove untracked files and directories,cleanup repo
+docker,docker images,List docker images,images list
+docker,docker volume ls,List docker volumes,volumes list
+python,python -m http.server 8000,Start simple HTTP server,server local
+ssh,ssh <user>@<host>,Connect to remote server via SSH,remote access
+ssh,scp file.txt <user>@<host>:/path/,Copy file to remote server,remote copy
+netstat,ss -tlnp,Show listening TCP ports,network debug
+netstat,lsof -i :8080,Check what is using port 8080,port debug
+git,git commit --amend,Amend the last commit,commit fix
+git,git reset HEAD~1,Undo last commit keeping changes,commit undo
+git,git checkout -b <branch>,Create and switch to new branch,branch create
