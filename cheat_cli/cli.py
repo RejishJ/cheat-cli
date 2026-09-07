@@ -606,10 +606,12 @@ def cmd_export(args: argparse.Namespace, service: CheatService) -> int:
 
 def cmd_import(args: argparse.Namespace, service: CheatService) -> int:
     """Handle 'cheat import <file>'."""
-    from .core.models import CSV_FIELDS, Entry
+    from .core.models import Entry
     from .core.storage import load_entries as storage_load_entries
     from .core.storage import save_entries as storage_save_entries
     from .core.storage import user_csv_path
+
+    _IMPORT_REQUIRED = {"tool", "command", "description", "tags"}
 
     input_path = Path(args.file)
     if not input_path.exists():
@@ -626,7 +628,7 @@ def cmd_import(args: argparse.Namespace, service: CheatService) -> int:
                 print(red("Error: empty CSV file."), file=sys.stderr)
                 return 1
 
-            missing = set(CSV_FIELDS) - set(reader.fieldnames)
+            missing = _IMPORT_REQUIRED - set(reader.fieldnames)
             if missing:
                 print(
                     red(f"Error: CSV missing required columns: {', '.join(sorted(missing))}"),
@@ -648,12 +650,19 @@ def cmd_import(args: argparse.Namespace, service: CheatService) -> int:
                         )
                         continue
 
-                    import_entries.append(Entry(
+                    entry = Entry(
                         tool=tool,
                         command=command,
                         description=description,
                         tags=tags,
-                    ))
+                        id=row.get("id", "").strip(),
+                        platform=row.get("platform", "").strip(),
+                        shell=row.get("shell", "").strip(),
+                        source=row.get("source", "").strip() or "user",
+                        created_at=row.get("created_at", "").strip(),
+                        updated_at=row.get("updated_at", "").strip(),
+                    )
+                    import_entries.append(entry)
                 except (KeyError, ValueError) as e:
                     print(
                         yellow(f"Warning: row {row_num} malformed, skipping: {e}"),

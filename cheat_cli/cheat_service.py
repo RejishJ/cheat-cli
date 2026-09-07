@@ -8,24 +8,31 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .core.backend import StorageBackend
+from .core.csv_storage import CSVStorage
 from .core.models import Entry
 from .core.search import search_entries
-from .core.storage import add_entry as storage_add_entry
-from .core.storage import delete_entries_by_values as storage_delete_entries_by_values
-from .core.storage import delete_entry as storage_delete_entry
-from .core.storage import load_entries
-from .core.storage import update_entry as storage_update_entry
+from .core.storage import ensure_user_csv
 
 
 class CheatService:
     """Application service coordinating cheat-cli operations."""
 
-    def __init__(self, csv_path: Path | None = None) -> None:
-        self._csv_path = csv_path
+    def __init__(
+        self,
+        csv_path: Path | None = None,
+        backend: StorageBackend | None = None,
+    ) -> None:
+        if backend is not None:
+            self._backend = backend
+        elif csv_path is not None:
+            self._backend = CSVStorage(csv_path)
+        else:
+            self._backend = CSVStorage(ensure_user_csv())
 
     def list_entries(self) -> list[Entry]:
         """Load all entries from storage."""
-        return load_entries(self._csv_path)
+        return self._backend.load()
 
     def search_filtered(self, entries: list[Entry], query: str) -> list[Entry]:
         """Filter a pre-loaded list of entries by query across all fields."""
@@ -33,7 +40,7 @@ class CheatService:
 
     def search_all(self, query: str) -> list[Entry]:
         """Load all entries and filter by query across all fields."""
-        return search_entries(load_entries(self._csv_path), query)
+        return search_entries(self._backend.load(), query)
 
     def add_entry(
         self,
@@ -47,7 +54,9 @@ class CheatService:
         Raises:
             ValueError: If the entry is invalid or a duplicate command exists.
         """
-        return storage_add_entry(tool, command, description, tags, self._csv_path)
+        entry = Entry(tool=tool, command=command, description=description, tags=tags)
+        self._backend.add(entry)
+        return entry
 
     def delete_entry(self, entry: Entry) -> bool:
         """Delete a single entry by value equality.
@@ -55,7 +64,7 @@ class CheatService:
         Returns:
             True if deleted, False if not found.
         """
-        return storage_delete_entry(entry, self._csv_path)
+        return self._backend.delete(entry)
 
     def update_entry(
         self,
@@ -70,9 +79,9 @@ class CheatService:
         Raises:
             ValueError: If the entry is not found or command conflicts.
         """
-        return storage_update_entry(
-            original, tool, command, description, tags, self._csv_path
-        )
+        updated = Entry(tool=tool, command=command, description=description, tags=tags)
+        self._backend.update(original, updated)
+        return updated
 
     def delete_entries_by_values(self, entries: list[Entry]) -> int:
         """Delete specific entries by value equality.
@@ -80,4 +89,10 @@ class CheatService:
         Returns:
             Number of entries deleted.
         """
-        return storage_delete_entries_by_values(entries, self._csv_path)
+        if not entries:
+            return 0
+        deleted = 0
+        for entry in entries:
+            if self._backend.delete(entry):
+                deleted += 1
+        return deleted

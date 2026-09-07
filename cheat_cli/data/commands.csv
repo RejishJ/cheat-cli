@@ -1,50 +1,50 @@
-tool,command,description,tags
-git,git status,Show current git working tree status,repo state branch
-git,git log --oneline -10,Show last 10 commits in compact format,history log
-git,git diff,Show unstaged changes,diff changes
-git,git add -p,Interactively stage changes,h staging
-git,git commit -m "msg",Commit staged changes with message,commit
-git,git rebase -i,Interactive rebase to edit history,rebase history
-git,git stash,Stash uncommitted changes,stash save work
-git,git branch -a,List all branches including remote,branch list
-docker,docker ps,List running containers,containers list
-docker,docker compose up -d,Start services in detached mode,services start
-docker,docker compose logs -f,Follow service logs,logs debug
-docker,docker exec -it <container> bash,Open shell in running container,shell access
-docker,docker system prune -a,Remove unused containers and images,cleanup space
-python,python -m venv .venv,Create a virtual environment,venv setup
-python,pip install -r requirements.txt,Install dependencies from file,install deps
-python,python -m pytest,Run tests with pytest,testing
-python,python -m black .,Format code with black,formatting style
-python,python -m ruff check .,Lint code with ruff,linting style
-curl,curl -s -o /dev/null -w "%{http_code}" <url>,Get HTTP status code only,http status check
-curl,curl -X POST -H "Content-Type: application/json" -d '{}' <url>,Send JSON POST request,api post
-ssh,ssh -L 8080:localhost:80 <host>,Forward local port 8080 to remote host,tunnel port
-ssh,ssh -N -f -L 5432:localhost:5432 <host>,Background SSH tunnel for database,tunnel db
-find,find . -name "*.py" -type f,Find all Python files in directory,search files
-find,find . -mtime -7 -type f,Find files modified in last 7 days,search recent
-grep,grep -rn "pattern" .,Recursive search with line numbers,search text
-grep,grep -l "pattern" **/*.py,Find files containing pattern,search files
-xargs,find . -name "*.log" -delete,Delete all .log files, cleanup
-tar,tar -czf archive.tar.gz <dir>,Create compressed archive,archive compress
-tar,tar -xzf archive.tar.gz,Extract compressed archive,archive extract
-chmod,chmod +x script.sh,Make script executable,permissions
-chmod,chmod 700 ~/.ssh,Secure SSH directory,permissions security
-systemctl,systemctl status <service>,Check service status,service debug
-systemctl,systemctl restart <service>,Restart a service,service restart
-awk,awk '{print $1}' file,Print first column of file,text processing
-sed,sed -i 's/old/new/g' file,Replace text in file in-place,text replace
-jq,jq '.key' file.json,Extract key from JSON,json query
-jq,jq -c '.' file.json,Compact JSON output,json format
-git,git log --graph --oneline --all,Visual commit graph,history graph
-git,git clean -fd,Remove untracked files and directories,cleanup repo
-docker,docker images,List docker images,images list
-docker,docker volume ls,List docker volumes,volumes list
-python,python -m http.server 8000,Start simple HTTP server,server local
-ssh,ssh <user>@<host>,Connect to remote server via SSH,remote access
-ssh,scp file.txt <user>@<host>:/path/,Copy file to remote server,remote copy
-netstat,ss -tlnp,Show listening TCP ports,network debug
-netstat,lsof -i :8080,Check what is using port 8080,port debug
-git,git commit --amend,Amend the last commit,commit fix
-git,git reset HEAD~1,Undo last commit keeping changes,commit undo
-git,git checkout -b <branch>,Create and switch to new branch,branch create
+id,tool,command,description,tags,platform,shell,source,created_at,updated_at
+d2b3de12-ee66-5b50-85aa-f92a13cc1d80,git,git status,Show current git working tree status,repo state branch,,,bundled,,
+cfe1e134-5bb9-5a4c-bc07-1317ac145447,git,git log --oneline -10,Show last 10 commits in compact format,history log,,,bundled,,
+0c2aab33-0422-51e5-b171-22477f6a4ce2,git,git diff,Show unstaged changes,diff changes,,,bundled,,
+1043cede-3438-5a1a-bc50-c1c048d1f353,git,git add -p,Interactively stage changes,h staging,,,bundled,,
+6d220815-8e78-5c0f-9859-920c9be9b320,git,git commit -m "msg",Commit staged changes with message,commit,,,bundled,,
+574adda8-7041-5a37-ba02-208839a06989,git,git rebase -i,Interactive rebase to edit history,rebase history,,,bundled,,
+ae9c6bb8-dd21-5ea0-87a1-f7738b275ba4,git,git stash,Stash uncommitted changes,stash save work,,,bundled,,
+39c8cb62-a042-5283-b0dc-274f80b122c4,git,git branch -a,List all branches including remote,branch list,,,bundled,,
+1cea9397-49f0-5806-9f22-2e61ee1fef63,docker,docker ps,List running containers,containers list,,,bundled,,
+1910f319-bd0c-5f96-a42a-7b8820266680,docker,docker compose up -d,Start services in detached mode,services start,,,bundled,,
+0584b173-b10c-52dd-9cf1-783d7abe0034,docker,docker compose logs -f,Follow service logs,logs debug,,,bundled,,
+5e7fd7c4-2653-5199-b696-2f90ff15fd73,docker,docker exec -it <container> bash,Open shell in running container,shell access,,,bundled,,
+d9752a7c-8892-5b89-9177-ec71b232aac1,docker,docker system prune -a,Remove unused containers and images,cleanup space,,,bundled,,
+62ab45ef-17be-5925-bca0-7b710de9192f,python,python -m venv .venv,Create a virtual environment,venv setup,,,bundled,,
+23c4dd8f-d013-544c-b5cc-f4740844d4bd,python,pip install -r requirements.txt,Install dependencies from file,install deps,,,bundled,,
+e5e30c72-4564-5753-b80f-e041b69ffc03,python,python -m pytest,Run tests with pytest,testing,,,bundled,,
+3bc19b95-39b9-5c0a-9233-3abfcb40bfde,python,python -m black .,Format code with black,formatting style,,,bundled,,
+68cf9517-a7d6-59e2-bd96-f6997f231659,python,python -m ruff check .,Lint code with ruff,linting style,,,bundled,,
+ad280709-c33c-56ca-b9fe-de0e22bd4935,curl,curl -s -o /dev/null -w "%{http_code}" <url>,Get HTTP status code only,http status check,,,bundled,,
+975cd869-4b46-5215-ad88-68910b3448e5,curl,curl -X POST -H "Content-Type: application/json" -d '{}' <url>,Send JSON POST request,api post,,,bundled,,
+46bbba8f-a2f5-5343-9edb-e8c99488030c,ssh,ssh -L 8080:localhost:80 <host>,Forward local port 8080 to remote host,tunnel port,,,bundled,,
+f5df0568-2461-5396-acc1-a8637accb530,ssh,ssh -N -f -L 5432:localhost:5432 <host>,Background SSH tunnel for database,tunnel db,,,bundled,,
+e399083c-bbb7-5dd6-b91d-4f20903e6c9f,find,find . -name "*.py" -type f,Find all Python files in directory,search files,,,bundled,,
+6782e418-7204-5562-8579-e2c2dbe464ab,find,find . -mtime -7 -type f,Find files modified in last 7 days,search recent,,,bundled,,
+212619a6-14a4-5784-adf2-a971ae14a9fc,grep,grep -rn "pattern" .,Recursive search with line numbers,search text,,,bundled,,
+3c7d00ac-93f7-5f77-a326-0f99f951cabe,grep,grep -l "pattern" **/*.py,Find files containing pattern,search files,,,bundled,,
+f5cfe1b4-e175-5c9e-b0fb-60792db31c32,find,find . -name "*.log" -delete,Delete all .log files, cleanup,,,bundled,,
+b776bf59-1953-596f-a21f-f239865989d0,tar,tar -czf archive.tar.gz <dir>,Create compressed archive,archive compress,,,bundled,,
+12c32668-09ec-59aa-afdb-2cf9739663a5,tar,tar -xzf archive.tar.gz,Extract compressed archive,archive extract,,,bundled,,
+b29620c8-6dbe-5bcb-bfab-216b1c75b2af,chmod,chmod +x script.sh,Make script executable,permissions,,,bundled,,
+25913598-b956-5ac1-9649-0ba519868ac0,chmod,chmod 700 ~/.ssh,Secure SSH directory,permissions security,,,bundled,,
+92232f4e-5c0d-59ab-a480-840740187fbb,systemctl,systemctl status <service>,Check service status,service debug,,,bundled,,
+ca43f4ea-ea41-5aca-acc4-0565ed5cdd5c,systemctl,systemctl restart <service>,Restart a service,service restart,,,bundled,,
+66c81141-e0d4-5875-9456-c42fdac53a1f,awk,awk '{print $1}' file,Print first column of file,text processing,,,bundled,,
+d30f66c9-9882-5156-b5fa-1ec013569e7b,sed,sed -i 's/old/new/g' file,Replace text in file in-place,text replace,,,bundled,,
+f13540fc-22b7-5bdc-8ede-94d7007b0e42,jq,jq '.key' file.json,Extract key from JSON,json query,,,bundled,,
+3c9eb0a4-f243-5b09-8ece-552b4c759ebd,jq,jq -c '.' file.json,Compact JSON output,json format,,,bundled,,
+3ddacf7e-402f-5510-a8ac-7c49abde63cf,git,git log --graph --oneline --all,Visual commit graph,history graph,,,bundled,,
+619e5374-cc39-5c2e-a7fc-7de0ede704cf,git,git clean -fd,Remove untracked files and directories,cleanup repo,,,bundled,,
+4aaf63cd-c073-5d8f-a4da-a68a4ae45516,docker,docker images,List docker images,images list,,,bundled,,
+56388ce8-c888-5325-8748-1135dd44ae4f,docker,docker volume ls,List docker volumes,volumes list,,,bundled,,
+70a6841c-04e2-598e-a5a5-c33d5dcb2d8d,python,python -m http.server 8000,Start simple HTTP server,server local,,,bundled,,
+c4270a0d-aca0-5eac-a092-39f52c9af19a,ssh,ssh <user>@<host>,Connect to remote server via SSH,remote access,,,bundled,,
+70ae2057-ff70-5c11-8b3f-d1f5765ee953,ssh,scp file.txt <user>@<host>:/path/,Copy file to remote server,remote copy,,,bundled,,
+d1a6ff17-e03b-5139-be48-a0e3f9a2282b,netstat,ss -tlnp,Show listening TCP ports,network debug,,,bundled,,
+93adfaf4-5676-5e95-a40e-a1c0b0537a2f,netstat,lsof -i :8080,Check what is using port 8080,port debug,,,bundled,,
+fe9077eb-cfa7-5ef8-8a97-34f2345d4db5,git,git commit --amend,Amend the last commit,commit fix,,,bundled,,
+87688201-fd0d-5c9f-bcb2-3586eedc5c80,git,git reset HEAD~1,Undo last commit keeping changes,commit undo,,,bundled,,
+94469d43-c37c-5add-ae03-d7de24d77f0d,git,git checkout -b <branch>,Create and switch to new branch,branch create,,,bundled,,

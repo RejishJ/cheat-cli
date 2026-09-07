@@ -37,13 +37,51 @@ class TestEntry:
     def test_to_dict(self):
         e = Entry(tool="git", command="git status", description="Show status", tags="repo")
         d = e.to_dict()
-        assert d == {
-            "tool": "git",
-            "command": "git status",
-            "description": "Show status",
-            "tags": "repo",
-        }
+        assert d["tool"] == "git"
+        assert d["command"] == "git status"
+        assert d["description"] == "Show status"
+        assert d["tags"] == "repo"
+        assert d["id"]
+        assert d["source"] == "user"
+        assert d["created_at"]
         assert list(d.keys()) == CSV_FIELDS
+
+    def test_id_generated_when_missing(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.id
+        assert len(e.id) == 36
+
+    def test_supplied_id_preserved(self):
+        custom_id = "custom-id-12345"
+        e = Entry(tool="git", command="git status", description="", tags="", id=custom_id)
+        assert e.id == custom_id
+
+    def test_created_at_generated_when_missing(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.created_at
+        assert "+00:00" in e.created_at
+
+    def test_supplied_created_at_preserved(self):
+        ts = "2026-01-01T00:00:00+00:00"
+        e = Entry(tool="git", command="git status", description="", tags="", created_at=ts)
+        assert e.created_at == ts
+
+    def test_updated_at_defaults_empty(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.updated_at == ""
+
+    def test_source_defaults_to_user(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.source == "user"
+
+    def test_supplied_source_preserved(self):
+        e = Entry(tool="git", command="git status", description="", tags="", source="bundled")
+        assert e.source == "bundled"
+
+    def test_platform_shell_defaults_empty(self):
+        e = Entry(tool="git", command="git status", description="", tags="")
+        assert e.platform == ""
+        assert e.shell == ""
 
     def test_matches_exact(self):
         e = Entry(tool="git", command="git status", description="Show status", tags="repo")
