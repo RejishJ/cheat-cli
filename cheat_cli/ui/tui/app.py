@@ -12,6 +12,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Static
 
 from ...cheat_service import CheatService
+from ..clipboard import ClipboardError, copy_to_clipboard
 from .browser import EntryTable
 
 if TYPE_CHECKING:
@@ -46,6 +47,7 @@ _HELP_TEXT = """\
 
 [/]              Search
 [enter]          Open details
+[y]              Copy command
 [escape]         Close search / clear filter / go back
 [?]              Show this help
 [q]              Quit
@@ -166,10 +168,13 @@ class BrowserScreen(Screen):
         Binding("ctrl+u", "page_up", "Page Up", show=False, priority=True),
         Binding("g", "cursor_first", "First", show=False, priority=True),
         Binding("G", "cursor_last", "Last", show=False, priority=True),
+        Binding("y", "copy_command", "Copy", show=False, priority=True),
         Binding("q", "quit", "Quit", show=False, priority=True),
         Binding("escape", "cancel_or_quit", "Quit", show=False, priority=True),
         Binding("question_mark", "show_help", "Help", show=False, priority=True),
     ]
+
+    _clipboard_fn = staticmethod(copy_to_clipboard)
 
     def __init__(self, entries: list[Entry], query: str = "") -> None:
         super().__init__()
@@ -177,6 +182,7 @@ class BrowserScreen(Screen):
         self.entries = list(entries)
         self.active_query = query
         self.search_active = False
+        self._clipboard_feedback: str | None = None
 
     def check_action(self, action: str, params: tuple) -> bool | None:
         return not (self.search_active and action in _BROWSER_NAV_ACTIONS)
@@ -210,10 +216,12 @@ class BrowserScreen(Screen):
                 self.action_open_detail()
 
     def _status_hint(self) -> str:
+        if self._clipboard_feedback:
+            return self._clipboard_feedback
         total = len(self.all_entries)
         shown = len(self.entries)
         count = f"{shown}/{total}" if self.active_query else str(total)
-        base = "j/k Navigate  Enter Details  ? Help  q Quit"
+        base = "j/k Navigate  Enter Details  y Copy  ? Help  q Quit"
         if self.search_active:
             return f"Search ({count})  |  Enter Confirm  Esc Cancel  |  {base}"
         if self.active_query:
@@ -278,6 +286,23 @@ class BrowserScreen(Screen):
 
     def action_show_help(self) -> None:
         self.app.push_screen(HelpScreen())
+
+    def action_copy_command(self) -> None:
+        """Copy the selected entry's command to the clipboard."""
+        entry = self.query_one(EntryTable).selected_entry()
+        if entry is None:
+            return
+        try:
+            self._clipboard_fn(entry.command)
+            self._clipboard_feedback = f"Copied: {entry.command}"
+        except ClipboardError:
+            self._clipboard_feedback = "Could not copy command"
+        self._update_status()
+        self.set_timer(1.5, self._clear_clipboard_feedback)
+
+    def _clear_clipboard_feedback(self) -> None:
+        self._clipboard_feedback = None
+        self._update_status()
 
     def action_cursor_down(self) -> None:
         self.query_one(EntryTable).move_down()

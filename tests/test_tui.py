@@ -896,3 +896,109 @@ class TestTuiTags:
             table = entry_table.query_one("#entry-table")
             assert table.columns is not None
             assert len(list(table.columns)) == 4
+
+
+class TestTuiCopyCommand:
+    async def test_y_copies_selected_command(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        copied: list[str] = []
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: copied.append(text)
+            await pilot.press("y")
+            assert copied == ["git status"]
+
+    async def test_y_copies_different_selected_command(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        copied: list[str] = []
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: copied.append(text)
+            await pilot.press("j")
+            await pilot.press("j")
+            await pilot.press("y")
+            assert copied == ["git diff"]
+
+    async def test_y_after_filtering(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        copied: list[str] = []
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: copied.append(text)
+            await pilot.press("slash")
+            await pilot.press("d", "o", "c", "k", "e", "r")
+            await pilot.press("enter")
+            await pilot.press("y")
+            assert copied == ["docker ps"]
+
+    async def test_y_with_zero_results(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        from cheat_cli.ui.tui.browser import EntryTable
+        app = CheatApp(service=tui_service)
+        copied: list[str] = []
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: copied.append(text)
+            await pilot.press("slash")
+            await pilot.press("z", "z", "z")
+            entry_table = app.screen.query_one(EntryTable)
+            assert entry_table.entry_count == 0
+            await pilot.press("y")
+            assert copied == []
+
+    async def test_y_with_no_entries(self, empty_tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=empty_tui_service)
+        copied: list[str] = []
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: copied.append(text)
+            await pilot.press("y")
+            assert copied == []
+
+    async def test_y_shows_success_feedback(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: None
+            await pilot.press("y")
+            assert screen._clipboard_feedback == "Copied: git status"
+
+    async def test_y_shows_failure_feedback(self, tui_service: CheatService):
+        from cheat_cli.ui.clipboard import ClipboardError
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+
+        def failing_clipboard(text: str) -> None:
+            raise ClipboardError("no clipboard")
+
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = failing_clipboard
+            await pilot.press("y")
+            assert screen._clipboard_feedback == "Could not copy command"
+
+    async def test_feedback_clears_after_timer(self, tui_service: CheatService):
+        import asyncio
+
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            screen._clipboard_fn = lambda text: None
+            await pilot.press("y")
+            assert screen._clipboard_feedback == "Copied: git status"
+            await asyncio.sleep(2.0)
+            assert screen._clipboard_feedback is None
