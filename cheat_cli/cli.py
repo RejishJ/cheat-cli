@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """CLI dispatcher for cheat-cli.
 
 Provides the main entry point and argument parsing.
