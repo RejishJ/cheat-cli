@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING
 
 from textual.app import App, ComposeResult
@@ -19,6 +20,19 @@ from .browser import EntryTable
 
 if TYPE_CHECKING:
     from ...core.models import Entry
+
+
+def run_after_delay(delay: float, func: callable) -> None:
+    """Run a function after a delay in a background thread.
+
+    This is used for non-blocking operations like AI provider calls.
+    """
+    def wrapper() -> None:
+        func()
+
+    timer = threading.Timer(delay, wrapper)
+    timer.daemon = True
+    timer.start()
 
 
 class SearchInput(Input):
@@ -54,6 +68,7 @@ _HELP_TEXT = """\
 [d]              Delete command
 [y]              Copy command
 [r]              Run command
+[i]              AI suggest
 [escape]         Close search / clear filter / go back
 [?]              Show this help
 [q]              Quit
@@ -436,7 +451,7 @@ class DeleteConfirmScreen(Screen):
 _BROWSER_NAV_ACTIONS = frozenset({
     "cursor_down", "cursor_up", "cursor_first", "cursor_last",
     "page_down", "page_up", "quit",
-    "add_entry", "edit_entry", "delete_entry",
+    "add_entry", "edit_entry", "delete_entry", "ai_suggest",
 })
 
 
@@ -485,6 +500,7 @@ class BrowserScreen(Screen):
         Binding("d", "delete_entry", "Delete", show=False, priority=True),
         Binding("y", "copy_command", "Copy", show=False, priority=True),
         Binding("r", "run_command", "Run", show=False, priority=True),
+        Binding("i", "ai_suggest", "AI Suggest", show=False, priority=True),
         Binding("q", "quit", "Quit", show=False, priority=True),
         Binding("escape", "cancel_or_quit", "Quit", show=False, priority=True),
         Binding("question_mark", "show_help", "Help", show=False, priority=True),
@@ -539,7 +555,7 @@ class BrowserScreen(Screen):
         total = len(self.all_entries)
         shown = len(self.entries)
         count = f"{shown}/{total}" if self.active_query else str(total)
-        base = "j/k Navigate  Enter Details  a Add  e Edit  d Delete  y Copy  r Run  ? Help  q Quit"
+        base = "j/k Navigate  Enter Details  a Add  e Edit  d Delete  y Copy  r Run  i AI  ? Help  q Quit"
         if self.search_active:
             return f"Search ({count})  |  Enter Confirm  Esc Cancel  |  {base}"
         if self.active_query:
@@ -621,6 +637,27 @@ class BrowserScreen(Screen):
     def _clear_clipboard_feedback(self) -> None:
         self._clipboard_feedback = None
         self._update_status()
+
+    def action_ai_suggest(self) -> None:
+        """Open the AI suggestion screen."""
+        try:
+            from .ai import AIRequestScreen
+        except ImportError:
+            self._feedback("AI module not available")
+            return
+
+        self.app.push_screen(
+            AIRequestScreen(),
+            callback=self._on_ai_request_result,
+        )
+
+    def _on_ai_request_result(self, request: str | None) -> None:
+        if request is None:
+            return
+        from .ai import AISuggestionsScreen
+
+        screen = AISuggestionsScreen(request)
+        self.app.push_screen(screen)
 
     def action_run_command(self) -> None:
         """Execute the selected entry's command."""

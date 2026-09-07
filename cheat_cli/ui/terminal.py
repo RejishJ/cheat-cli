@@ -49,3 +49,8 @@ def blue(text: str) -> str:
 def bold(text: str) -> str:
     """Make text bold."""
     return colorize(text, "1")
+
+
+def yellow(text: str) -> str:
+    """Color text yellow (for warnings)."""
+    return colorize(text, "93")
