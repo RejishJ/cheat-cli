@@ -208,6 +208,63 @@ def delete_entries_by_values(
     return deleted_count
 
 
+def update_entry(
+    original: Entry,
+    tool: str,
+    command: str,
+    description: str,
+    tags: str,
+    csv_path: Path | None = None,
+) -> Entry:
+    """Update an existing entry by value equality.
+
+    Finds the first entry matching all four fields of `original` and replaces
+    it with a new entry built from the provided values.  If the new command
+    already exists in a *different* entry, raises ValueError.
+
+    Args:
+        original: The entry to replace (matched by value, not identity).
+        tool: New tool name.
+        command: New command string.
+        description: New description.
+        tags: New tags string.
+        csv_path: Path to CSV file. If None, uses the user's default path.
+
+    Returns:
+        The newly created Entry that replaced the original.
+
+    Raises:
+        ValueError: If the original is not found, or if the new command
+            conflicts with a different existing entry.
+    """
+    entries = load_entries(csv_path)
+
+    # Locate the original entry
+    original_index: int | None = None
+    for i, existing in enumerate(entries):
+        if (
+            existing.tool == original.tool
+            and existing.command == original.command
+            and existing.description == original.description
+            and existing.tags == original.tags
+        ):
+            original_index = i
+            break
+
+    if original_index is None:
+        raise ValueError("Entry not found")
+
+    # Check for command conflict with a *different* entry
+    for i, existing in enumerate(entries):
+        if i != original_index and existing.command == command:
+            raise ValueError(f"Command already exists: {command}")
+
+    updated = Entry(tool=tool, command=command, description=description, tags=tags)
+    entries[original_index] = updated
+    save_entries(entries, csv_path)
+    return updated
+
+
 def delete_entries(
     query: str,
     csv_path: Path | None = None,

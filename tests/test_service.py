@@ -195,3 +195,56 @@ class TestDeleteEntriesByValues:
 
         entries = service.list_entries()
         assert len(entries) == 3
+
+
+class TestUpdateEntry:
+    def test_update_entry(self, service: CheatService):
+        entries = service.list_entries()
+        original = entries[0]
+        assert original.command == "git status"
+
+        updated = service.update_entry(
+            original,
+            tool="git",
+            command="git status --short",
+            description="Short status",
+            tags="repo",
+        )
+        assert updated.command == "git status --short"
+
+        reloaded = service.list_entries()
+        assert reloaded[0].command == "git status --short"
+
+    def test_update_nonexistent_raises(self, service: CheatService):
+        fake = Entry(tool="x", command="y", description="z", tags="w")
+        with pytest.raises(ValueError, match="Entry not found"):
+            service.update_entry(fake, "a", "b", "c", "d")
+
+    def test_update_conflict_raises(self, service: CheatService):
+        entries = service.list_entries()
+        original = entries[0]  # git status
+
+        with pytest.raises(ValueError, match="already exists"):
+            service.update_entry(
+                original, tool="git", command="git log --oneline", description="d", tags="t"
+            )
+
+        # Original unchanged
+        reloaded = service.list_entries()
+        assert reloaded[0].command == "git status"
+
+    def test_update_same_command_ok(self, service: CheatService):
+        entries = service.list_entries()
+        original = entries[0]
+
+        updated = service.update_entry(
+            original, tool="git", command="git status", description="Updated", tags="repo"
+        )
+        assert updated.description == "Updated"
+
+    def test_update_preserves_count(self, service: CheatService):
+        entries = service.list_entries()
+        service.update_entry(entries[0], "git", "git status -v", "Verbose", "repo")
+
+        reloaded = service.list_entries()
+        assert len(reloaded) == 3

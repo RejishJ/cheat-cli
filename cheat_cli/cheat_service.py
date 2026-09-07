@@ -14,6 +14,7 @@ from .core.storage import add_entry as storage_add_entry
 from .core.storage import delete_entries_by_values as storage_delete_entries_by_values
 from .core.storage import delete_entry as storage_delete_entry
 from .core.storage import load_entries
+from .core.storage import update_entry as storage_update_entry
 
 
 class CheatService:
@@ -55,6 +56,23 @@ class CheatService:
             True if deleted, False if not found.
         """
         return storage_delete_entry(entry, self._csv_path)
+
+    def update_entry(
+        self,
+        original: Entry,
+        tool: str,
+        command: str,
+        description: str,
+        tags: str,
+    ) -> Entry:
+        """Update an existing entry by value equality.
+
+        Raises:
+            ValueError: If the entry is not found or command conflicts.
+        """
+        return storage_update_entry(
+            original, tool, command, description, tags, self._csv_path
+        )
 
     def delete_entries_by_values(self, entries: list[Entry]) -> int:
         """Delete specific entries by value equality.

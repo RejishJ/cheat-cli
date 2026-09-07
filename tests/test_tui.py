@@ -56,6 +56,21 @@ def single_entry_service(tmp_path: Path) -> CheatService:
     return CheatService(csv_path=csv_path)
 
 
+def _create_risky_csv(
+    tmp_path: Path,
+    filename: str,
+    commands: list[tuple[str, str, str, str]],
+) -> CheatService:
+    """Create a CSV with risky commands for testing."""
+    csv_path = tmp_path / filename
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+        for tool, cmd, desc, tags in commands:
+            writer.writerow({"tool": tool, "command": cmd, "description": desc, "tags": tags})
+    return CheatService(csv_path=csv_path)
+
+
 class TestTuiStartup:
     async def test_app_starts(self, tui_service: CheatService):
         from cheat_cli.ui.tui.app import CheatApp
@@ -1002,3 +1017,1022 @@ class TestTuiCopyCommand:
             assert screen._clipboard_feedback == "Copied: git status"
             await asyncio.sleep(2.0)
             assert screen._clipboard_feedback is None
+
+
+class TestTuiRunCommand:
+    async def test_r_opens_result_for_safe_command(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.command == "git status"
+            assert app.screen.result.success is True
+
+    async def test_r_shows_result_output(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, ResultScreen
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.stdout is not None
+
+    async def test_r_esc_returns_to_browser(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_q_returns_to_browser(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            await pilot.press("q")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_no_entries_noop(self, empty_tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=empty_tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_risky_shows_confirm(self, tmp_path):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ConfirmScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "sudo rm -rf /tmp/test", "Remove temp files", "dangerous")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            assert "sudo rm -rf /tmp/test" in app.screen.command
+
+    async def test_r_risky_confirm_y_shows_result(self, tmp_path):
+        from cheat_cli.ui.tui.app import CheatApp, ConfirmScreen, ResultScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "pip uninstall nonexistent_pkg_xyz", "Uninstall nonexistent package", "test")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            assert "pip uninstall nonexistent_pkg_xyz" in app.screen.command
+            await pilot.press("y")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+
+    async def test_r_risky_n_cancels(self, tmp_path):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ConfirmScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "sudo rm -rf /tmp/test", "Remove temp files", "dangerous")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            await pilot.press("n")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_risky_esc_cancels(self, tmp_path):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ConfirmScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "sudo rm -rf /tmp/test", "Remove temp files", "dangerous")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_selection_preserved_after_cancel(self, tmp_path):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ConfirmScreen
+        from cheat_cli.ui.tui.browser import EntryTable
+
+        commands = [("tool", f"cmd{i}", f"Command {i}", "test") for i in range(5)]
+        commands.append(("system", "sudo rm -rf /tmp/test", "Remove temp files", "dangerous"))
+        service = _create_risky_csv(tmp_path, "risky.csv", commands)
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            table = screen.query_one(EntryTable)
+            table.select(5)
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            await pilot.press("n")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert table.flat_index == 5
+
+    async def test_r_risky_confirm_shows_command(self, tmp_path):
+        from cheat_cli.ui.tui.app import CheatApp, ConfirmScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "shutdown -h now", "Shutdown system", "system")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            assert "shutdown -h now" in app.screen.command
+            assert len(app.screen.risk_matches) >= 1
+
+    async def test_r_risky_confirm_shows_risk_descriptions(self, tmp_path):
+        from cheat_cli.ui.tui.app import CheatApp, ConfirmScreen
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "sudo rm -rf /tmp", "Remove temp", "dangerous")],
+        )
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ConfirmScreen)
+            descriptions = [m.description for m in app.screen.risk_matches]
+            assert any("sudo" in d.lower() or "privilege" in d.lower() for d in descriptions)
+
+    async def test_r_with_zero_search_results(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            await pilot.press("slash")
+            await pilot.press("z", "z", "z", "z", "z")
+            await pilot.press("enter")
+            await pilot.pause()
+            assert len(screen.entries) == 0
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+    async def test_r_mocked_execution(self, tui_service: CheatService):
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+
+        app = CheatApp(service=tui_service)
+
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            mock_result = RunResult(
+                command="git status",
+                stdout="On branch main\nnothing to commit",
+                stderr="",
+                return_code=0,
+            )
+            executed_commands: list[str] = []
+
+            def mock_execute(command: str) -> None:
+                executed_commands.append(command)
+                screen.app.push_screen(ResultScreen(mock_result))
+
+            screen._execute_command = mock_execute
+            await pilot.press("r")
+            await pilot.pause()
+            assert executed_commands == ["git status"]
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.stdout == "On branch main\nnothing to commit"
+
+    async def test_r_mocked_risky_execution(self, tmp_path):
+        from unittest.mock import patch
+
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import (
+            BrowserScreen,
+            CheatApp,
+            ConfirmScreen,
+            ResultScreen,
+        )
+
+        service = _create_risky_csv(
+            tmp_path, "risky.csv",
+            [("system", "sudo rm -rf /tmp/test", "Remove temp", "dangerous")],
+        )
+        app = CheatApp(service=service)
+
+        mock_result = RunResult(
+            command="sudo rm -rf /tmp/test",
+            stdout="",
+            stderr="",
+            return_code=0,
+        )
+
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            with patch(
+                "cheat_cli.ui.tui.app.run_command", return_value=mock_result
+            ) as mock_run:
+                await pilot.press("r")
+                await pilot.pause()
+                assert isinstance(app.screen, ConfirmScreen)
+                await pilot.press("y")
+                await pilot.pause()
+                mock_run.assert_called_once_with("sudo rm -rf /tmp/test")
+                assert isinstance(app.screen, ResultScreen)
+
+    async def test_r_result_shows_exit_code_zero(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, ResultScreen
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.return_code == 0
+
+    async def test_r_result_shows_exit_code_nonzero(self, tui_service: CheatService):
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            mock_result = RunResult(
+                command="false",
+                stdout="",
+                stderr="",
+                return_code=1,
+            )
+
+            def mock_execute(command: str) -> None:
+                app.push_screen(ResultScreen(mock_result))
+
+            screen._execute_command = mock_execute
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.return_code == 1
+
+    async def test_r_result_shows_timeout(self, tui_service: CheatService):
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            mock_result = RunResult(
+                command="sleep 10",
+                timed_out=True,
+                error="Command timed out after 30s",
+            )
+
+            def mock_execute(command: str) -> None:
+                app.push_screen(ResultScreen(mock_result))
+
+            screen._execute_command = mock_execute
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert app.screen.result.timed_out is True
+            assert "Timed out" in app.screen.result.status_label
+
+    async def test_r_result_shows_error(self, tui_service: CheatService):
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            mock_result = RunResult(
+                command="bad_cmd",
+                error="Command not found: [Errno 2] No such file",
+            )
+
+            def mock_execute(command: str) -> None:
+                app.push_screen(ResultScreen(mock_result))
+
+            screen._execute_command = mock_execute
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert "Error" in app.screen.result.status_label
+
+    async def test_r_result_shows_stderr(self, tui_service: CheatService):
+        from cheat_cli.runner import RunResult
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, ResultScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+
+            mock_result = RunResult(
+                command="echo err >&2",
+                stdout="",
+                stderr="some error output",
+                return_code=0,
+            )
+
+            def mock_execute(command: str) -> None:
+                app.push_screen(ResultScreen(mock_result))
+
+            screen._execute_command = mock_execute
+            await pilot.press("r")
+            await pilot.pause()
+            assert isinstance(app.screen, ResultScreen)
+            assert "some error output" in str(app.screen.result.stderr)
+
+    async def test_r_no_auto_execution(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            screen = app.screen
+            assert isinstance(screen, BrowserScreen)
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+
+class TestTuiAdd:
+    async def test_a_opens_editor(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_editor_title_add(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+            assert app.screen.editor_title == "Add Command"
+
+    async def test_editor_starts_empty(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            assert tool_input.value == ""
+            assert command_input.value == ""
+
+    async def test_add_valid_entry(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            initial_count = len(app.service.list_entries())
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            # Fill fields
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            desc_input = app.screen.query_one("#description-input")
+            tags_input = app.screen.query_one("#tags-input")
+            tool_input.value = "kubectl"
+            command_input.value = "kubectl get svc"
+            desc_input.value = "List services"
+            tags_input.value = "k8s networking"
+
+            # Save
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+            # Verify entry was added
+            entries = app.service.list_entries()
+            assert len(entries) == initial_count + 1
+            assert entries[-1].command == "kubectl get svc"
+            assert entries[-1].tool == "kubectl"
+
+    async def test_add_empty_tool_rejected(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            command_input = app.screen.query_one("#command-input")
+            command_input.value = "some command"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            # Should still be on editor with error
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_add_empty_command_rejected(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            tool_input.value = "some tool"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_add_cancel_no_entry(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            initial_count = len(app.service.list_entries())
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == initial_count
+
+    async def test_new_entry_appears_in_browser(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+        from cheat_cli.ui.tui.browser import EntryTable
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            tool_input.value = "tmux"
+            command_input.value = "tmux new -s work"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+            table = app.screen.query_one(EntryTable)
+            assert table.entry_count == len(app.service.list_entries())
+
+    async def test_add_persists_after_reload(self, tmp_path):
+        import csv
+
+        from cheat_cli.cheat_service import CheatService
+        from cheat_cli.core.models import CSV_FIELDS
+        from cheat_cli.ui.tui.app import CheatApp, EditorScreen
+
+        csv_path = tmp_path / "cmds.csv"
+        with open(csv_path, "w", newline="") as f:  # noqa: ASYNC230
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+            writer.writeheader()
+            writer.writerow({"tool": "git", "command": "git status", "description": "Show status", "tags": "repo"})
+
+        service = CheatService(csv_path=csv_path)
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            tool_input.value = "python"
+            command_input.value = "python -m pytest"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+        # Reload and verify
+        service2 = CheatService(csv_path=csv_path)
+        entries = service2.list_entries()
+        assert len(entries) == 2
+        assert entries[1].command == "python -m pytest"
+
+
+class TestTuiEdit:
+    async def test_e_opens_editor(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_editor_title_edit(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+            assert app.screen.editor_title == "Edit Command"
+
+    async def test_editor_prepopulated(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            tags_input = app.screen.query_one("#tags-input")
+            assert tool_input.value == "git"
+            assert command_input.value == "git status"
+            assert tags_input.value == "repo state"
+
+    async def test_edit_valid_change(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Updated description"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+            entries = app.service.list_entries()
+            assert entries[0].description == "Updated description"
+            assert entries[0].command == "git status"
+
+    async def test_edit_empty_tool_rejected(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            tool_input.value = ""
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_edit_empty_command_rejected(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            command_input = app.screen.query_one("#command-input")
+            command_input.value = ""
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+    async def test_edit_cancel_no_change(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            original = app.service.list_entries()[0]
+
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Should not persist"
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+
+            entries = app.service.list_entries()
+            assert entries[0].description == original.description
+
+    async def test_edit_old_value_replaced(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            command_input = app.screen.query_one("#command-input")
+            command_input.value = "git status --porcelain"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+            entries = app.service.list_entries()
+            assert entries[0].command == "git status --porcelain"
+            assert all(e.command != "git status" for e in entries)
+
+    async def test_edit_unrelated_entries_unchanged(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            entries_before = app.service.list_entries()
+            second_cmd = entries_before[1].command
+
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Changed"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+            entries_after = app.service.list_entries()
+            assert entries_after[1].command == second_cmd
+
+    async def test_edit_persists_after_reload(self, tmp_path):
+        import csv
+
+        from cheat_cli.cheat_service import CheatService
+        from cheat_cli.core.models import CSV_FIELDS
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        csv_path = tmp_path / "cmds.csv"
+        with open(csv_path, "w", newline="") as f:  # noqa: ASYNC230
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+            writer.writeheader()
+            writer.writerow({"tool": "git", "command": "git status", "description": "Show status", "tags": "repo"})
+
+        service = CheatService(csv_path=csv_path)
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Persisted edit"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+        service2 = CheatService(csv_path=csv_path)
+        entries = service2.list_entries()
+        assert entries[0].description == "Persisted edit"
+
+
+class TestTuiDelete:
+    async def test_d_opens_confirm(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+    async def test_confirm_shows_command(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+            assert app.screen.entry.command == "git status"
+
+    async def test_confirm_n_cancels(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            initial_count = len(app.service.list_entries())
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("n")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == initial_count
+
+    async def test_confirm_esc_cancels(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            initial_count = len(app.service.list_entries())
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("escape")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == initial_count
+
+    async def test_confirm_y_deletes(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            initial_count = len(app.service.list_entries())
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("y")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == initial_count - 1
+
+    async def test_deletes_correct_entry(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            entries_before = app.service.list_entries()
+            deleted_cmd = entries_before[0].command
+
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("y")
+            await pilot.pause()
+
+            entries_after = app.service.list_entries()
+            assert all(e.command != deleted_cmd for e in entries_after)
+
+    async def test_delete_last_entry(self, tmp_path):
+        import csv
+
+        from cheat_cli.cheat_service import CheatService
+        from cheat_cli.core.models import CSV_FIELDS
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        csv_path = tmp_path / "single.csv"
+        with open(csv_path, "w", newline="") as f:  # noqa: ASYNC230
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+            writer.writeheader()
+            writer.writerow({"tool": "git", "command": "git status", "description": "Show status", "tags": "repo"})
+
+        service = CheatService(csv_path=csv_path)
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("y")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == 0
+
+    async def test_unrelated_entries_remain(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import CheatApp
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            entries_before = app.service.list_entries()
+            other_cmds = {e.command for e in entries_before[1:]}
+
+            await pilot.press("d")
+            await pilot.press("y")
+            await pilot.pause()
+
+            entries_after = app.service.list_entries()
+            assert {e.command for e in entries_after} == other_cmds
+
+    async def test_delete_persists_after_reload(self, tmp_path):
+        import csv
+
+        from cheat_cli.cheat_service import CheatService
+        from cheat_cli.core.models import CSV_FIELDS
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+
+        csv_path = tmp_path / "cmds.csv"
+        with open(csv_path, "w", newline="") as f:  # noqa: ASYNC230
+            writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
+            writer.writeheader()
+            writer.writerow({"tool": "git", "command": "git status", "description": "Show status", "tags": "repo"})
+            writer.writerow({"tool": "docker", "command": "docker ps", "description": "List", "tags": "containers"})
+
+        service = CheatService(csv_path=csv_path)
+        app = CheatApp(service=service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("d")
+            await pilot.press("y")
+            await pilot.pause()
+
+        service2 = CheatService(csv_path=csv_path)
+        entries = service2.list_entries()
+        assert len(entries) == 1
+        assert entries[0].command == "docker ps"
+
+
+class TestTuiEditDeleteState:
+    async def test_edit_while_filtered(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            # Filter to docker entries
+            await pilot.press("slash")
+            await pilot.pause()
+            await pilot.press("d", "o", "c", "k", "e", "r")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert len(app.screen.entries) == 2
+
+            # Edit the selected docker entry
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Edited filtered"
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+            assert isinstance(app.screen, BrowserScreen)
+            # Filter should be preserved
+            assert len(app.screen.entries) == 2
+
+    async def test_delete_while_filtered(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, DeleteConfirmScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("slash")
+            await pilot.pause()
+            await pilot.press("g", "i", "t")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            assert len(app.screen.entries) == 3  # git status, git log, git diff
+
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, DeleteConfirmScreen)
+
+            await pilot.press("y")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            # Filter should be preserved, but one git entry removed
+            assert len(app.screen.entries) == 2
+
+    async def test_selection_after_delete(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            # Move to second entry
+            await pilot.press("j")
+            await pilot.pause()
+
+            await pilot.press("d")
+            await pilot.press("y")
+            await pilot.pause()
+
+            assert isinstance(app.screen, BrowserScreen)
+            # Should still be able to navigate
+            await pilot.press("j")
+            await pilot.pause()
+
+    async def test_selection_after_edit(self, tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("j")
+            await pilot.pause()
+
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            desc_input = app.screen.query_one("#description-input")
+            desc_input.value = "Edited"
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+
+            assert isinstance(app.screen, BrowserScreen)
+            # Should still be navigable
+            await pilot.press("j")
+            await pilot.pause()
+
+    async def test_empty_state_add(self, empty_tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp, EditorScreen
+
+        app = CheatApp(service=empty_tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("a")
+            await pilot.pause()
+            assert isinstance(app.screen, EditorScreen)
+
+            tool_input = app.screen.query_one("#tool-input")
+            command_input = app.screen.query_one("#command-input")
+            tool_input.value = "git"
+            command_input.value = "git init"
+
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            assert len(app.service.list_entries()) == 1
+
+    async def test_empty_state_no_edit_or_delete(self, empty_tui_service: CheatService):
+        from cheat_cli.ui.tui.app import BrowserScreen, CheatApp
+
+        app = CheatApp(service=empty_tui_service)
+        async with app.run_test() as pilot:
+            assert isinstance(app.screen, BrowserScreen)
+            # e and d should be no-ops when no entry is selected
+            await pilot.press("e")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)
+            await pilot.press("d")
+            await pilot.pause()
+            assert isinstance(app.screen, BrowserScreen)

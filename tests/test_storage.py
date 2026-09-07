@@ -14,6 +14,7 @@ from cheat_cli.core.storage import (
     ensure_user_csv,
     load_entries,
     save_entries,
+    update_entry,
 )
 
 
@@ -255,6 +256,131 @@ class TestDeleteEntriesByValues:
         remaining = load_entries(csv_path)
         assert len(remaining) == 2
         assert all(e.command != "git status" for e in remaining)
+
+
+class TestUpdateEntry:
+    def test_update_entry(self, sample_csv: Path):
+        entries = load_entries(sample_csv)
+        original = entries[0]
+        assert original.command == "git status"
+
+        updated = update_entry(
+            original,
+            tool="git",
+            command="git status --short",
+            description="Short status",
+            tags="repo",
+            csv_path=sample_csv,
+        )
+        assert updated.command == "git status --short"
+        assert updated.description == "Short status"
+
+        reloaded = load_entries(sample_csv)
+        assert len(reloaded) == 3
+        assert reloaded[0].command == "git status --short"
+
+    def test_update_changes_all_fields(self, sample_csv: Path):
+        entries = load_entries(sample_csv)
+        original = entries[0]
+
+        updated = update_entry(
+            original,
+            tool="newtool",
+            command="newcommand",
+            description="newdesc",
+            tags="newtags",
+            csv_path=sample_csv,
+        )
+        assert updated.tool == "newtool"
+        assert updated.command == "newcommand"
+        assert updated.description == "newdesc"
+        assert updated.tags == "newtags"
+
+        reloaded = load_entries(sample_csv)
+        assert reloaded[0].tool == "newtool"
+        assert reloaded[0].command == "newcommand"
+
+    def test_update_nonexistent_raises(self, sample_csv: Path):
+        fake = Entry(tool="x", command="y", description="z", tags="w")
+        with pytest.raises(ValueError, match="Entry not found"):
+            update_entry(fake, "a", "b", "c", "d", csv_path=sample_csv)
+
+    def test_update_conflict_raises(self, sample_csv: Path):
+        entries = load_entries(sample_csv)
+        original = entries[0]  # git status
+
+        with pytest.raises(ValueError, match="already exists"):
+            update_entry(
+                original,
+                tool="git",
+                command="git log --oneline",  # conflicts with entries[1]
+                description="desc",
+                tags="tags",
+                csv_path=sample_csv,
+            )
+
+        # Original entry unchanged
+        reloaded = load_entries(sample_csv)
+        assert reloaded[0].command == "git status"
+
+    def test_update_same_command_no_conflict(self, sample_csv: Path):
+        """Updating an entry to keep the same command should not raise."""
+        entries = load_entries(sample_csv)
+        original = entries[0]
+
+        updated = update_entry(
+            original,
+            tool="git",
+            command="git status",  # same command
+            description="Updated description",
+            tags="updated",
+            csv_path=sample_csv,
+        )
+        assert updated.command == "git status"
+        assert updated.description == "Updated description"
+
+        reloaded = load_entries(sample_csv)
+        assert len(reloaded) == 3
+        assert reloaded[0].description == "Updated description"
+
+    def test_update_preserves_other_entries(self, sample_csv: Path):
+        entries = load_entries(sample_csv)
+        original = entries[0]
+
+        update_entry(
+            original,
+            tool="git",
+            command="git status --short",
+            description="Short status",
+            tags="repo",
+            csv_path=sample_csv,
+        )
+
+        reloaded = load_entries(sample_csv)
+        assert reloaded[1].command == "git log --oneline"
+        assert reloaded[2].command == "docker ps"
+
+    def test_update_by_value_not_identity(self, sample_csv: Path):
+        entries = load_entries(sample_csv)
+        original = entries[0]
+
+        loaded_again = load_entries(sample_csv)
+        copy = loaded_again[0]
+        assert original is not copy
+        assert original == copy
+
+        updated = update_entry(
+            copy,
+            tool="git",
+            command="git status --porcelain",
+            description="Porcelain",
+            tags="repo",
+            csv_path=sample_csv,
+        )
+        assert updated.command == "git status --porcelain"
+
+        reloaded = load_entries(sample_csv)
+        assert reloaded[0].command == "git status --porcelain"
 
 
 class TestEnsureUserCsv:
